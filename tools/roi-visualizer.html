@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+    <head>
+        <title>ROI Visualizer - LoL OCR</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .controls {
+                margin-bottom: 20px;
+                padding: 20px;
+                border: 1px solid #ddd;
+            }
+            .image-container {
+                position: relative;
+                display: inline-block;
+                border: 1px solid #ccc;
+            }
+            .roi-box {
+                position: absolute;
+                border: 2px solid;
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .roi-label {
+                position: absolute;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 2px 5px;
+                font-size: 12px;
+            }
+            input[type="file"] {
+                margin: 10px 0;
+            }
+            .roi-controls {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 10px;
+                margin: 20px 0;
+            }
+            .roi-control {
+                padding: 10px;
+                border: 1px solid #ddd;
+            }
+            .roi-control input {
+                width: 60px;
+                margin: 0 5px;
+            }
+            button {
+                padding: 10px 20px;
+                margin: 5px;
+                cursor: pointer;
+            }
+            .coords-display {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>ROI Visualizer - LoL OCR Debug</h1>
+
+            <div class="controls">
+                <input type="file" id="imageInput" accept="image/*" />
+                <button onclick="resetROIs()">Reset to Defaults</button>
+                <button onclick="exportConfig()">Export Config</button>
+            </div>
+
+            <div class="roi-controls" id="roiControls"></div>
+
+            <div class="image-container" id="imageContainer">
+                <img id="previewImage" style="max-width: 100%; height: auto" />
+            </div>
+
+            <div class="coords-display" id="coordsDisplay">Mouse: (0, 0)</div>
+        </div>
+
+        <script>
+            const defaultROIs = {
+                timer: { x: 575, y: 40, width: 45, height: 20, color: 'red' },
+                blueKills: { x: 525, y: 5, width: 38, height: 30, color: 'blue' },
+                redKills: { x: 630, y: 5, width: 38, height: 30, color: 'green' },
+                blueGold: { x: 460, y: 0, width: 50, height: 30, color: 'orange' },
+                redGold: { x: 685, y: 0, width: 50, height: 30, color: 'purple' },
+            };
+
+            let currentROIs = { ...defaultROIs };
+
+            function createROIControls() {
+                const container = document.getElementById("roiControls");
+                container.innerHTML = "";
+
+                Object.entries(currentROIs).forEach(([name, roi]) => {
+                    const div = document.createElement("div");
+                    div.className = "roi-control";
+                    div.innerHTML = `
+                    <h4>${name.toUpperCase()}</h4>
+                    <label>X: <input type="number" id="${name}-x" value="${roi.x}" onchange="updateROI('${name}', 'x', this.value)"></label>
+                    <label>Y: <input type="number" id="${name}-y" value="${roi.y}" onchange="updateROI('${name}', 'y', this.value)"></label>
+                    <label>W: <input type="number" id="${name}-width" value="${roi.width}" onchange="updateROI('${name}', 'width', this.value)"></label>
+                    <label>H: <input type="number" id="${name}-height" value="${roi.height}" onchange="updateROI('${name}', 'height', this.value)"></label>
+                `;
+                    container.appendChild(div);
+                });
+            }
+
+            function updateROI(name, property, value) {
+                currentROIs[name][property] = parseInt(value);
+                drawROIs();
+            }
+
+            function drawROIs() {
+                // Remove existing ROI elements
+                document
+                    .querySelectorAll(".roi-box, .roi-label")
+                    .forEach((el) => el.remove());
+
+                const container = document.getElementById("imageContainer");
+                const img = document.getElementById("previewImage");
+
+                if (!img.src) return;
+
+                // Calculate scale factor between displayed image and original
+                const scaleX = img.width / img.naturalWidth;
+                const scaleY = img.height / img.naturalHeight;
+
+                Object.entries(currentROIs).forEach(([name, roi]) => {
+                    // Scale coordinates to match displayed image
+                    const displayX = roi.x * scaleX;
+                    const displayY = roi.y * scaleY;
+                    const displayWidth = roi.width * scaleX;
+                    const displayHeight = roi.height * scaleY;
+
+                    // Create ROI box
+                    const box = document.createElement("div");
+                    box.className = "roi-box";
+                    box.style.left = displayX + "px";
+                    box.style.top = displayY + "px";
+                    box.style.width = displayWidth + "px";
+                    box.style.height = displayHeight + "px";
+                    box.style.borderColor = roi.color || 'red';
+                    container.appendChild(box);
+
+                    // Create label
+                    const label = document.createElement("div");
+                    label.className = "roi-label";
+                    label.textContent = `${name} (${roi.x},${roi.y})`;
+                    label.style.left = displayX + "px";
+                    label.style.top = (displayY - 20) + "px";
+                    label.style.backgroundColor = roi.color || 'red';
+                    container.appendChild(label);
+                });
+            }
+
+            function resetROIs() {
+                currentROIs = { ...defaultROIs };
+                createROIControls();
+                drawROIs();
+            }
+
+            function exportConfig() {
+                const config = {};
+                Object.entries(currentROIs).forEach(([name, roi]) => {
+                    config[name] = {
+                        x: roi.x,
+                        y: roi.y,
+                        width: roi.width,
+                        height: roi.height,
+                    };
+                });
+
+                const output = `export const LOL_ROI_PRESETS = ${JSON.stringify(config, null, 2)};`;
+
+                const blob = new Blob([output], { type: "text/javascript" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "roi-config.js";
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            // Image loading
+            document
+                .getElementById("imageInput")
+                .addEventListener("change", function (e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            const img = document.getElementById("previewImage");
+                            img.src = e.target.result;
+                            img.onload = function () {
+                                drawROIs();
+                            };
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+
+            // Mouse coordinates tracking
+            document
+                .getElementById("imageContainer")
+                .addEventListener("mousemove", function (e) {
+                    const rect = this.getBoundingClientRect();
+                    const img = document.getElementById("previewImage");
+                    const scaleX = img.naturalWidth / img.width;
+                    const scaleY = img.naturalHeight / img.height;
+
+                    const x = Math.round((e.clientX - rect.left) * scaleX);
+                    const y = Math.round((e.clientY - rect.top) * scaleY);
+
+                    document.getElementById("coordsDisplay").textContent =
+                        `Mouse: (${x}, ${y})`;
+                });
+
+            // Initialize
+            createROIControls();
+        </script>
+    </body>
+</html>
