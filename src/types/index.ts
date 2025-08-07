@@ -5,11 +5,18 @@ export interface OCRRequest {
   roi?: ROI;
 }
 
+export enum ROIType {
+  TIMER = "timer",
+  KILLS = "kills",
+  GOLD = "gold",
+}
+
 export interface ROI {
   x: number;
   y: number;
   width: number;
   height: number;
+  type: ROIType;
 }
 
 export interface OCRResult {
@@ -33,6 +40,8 @@ export interface ProcessVideoRequest {
   startTime?: number;
   endTime?: number;
   frameInterval?: number;
+  gamma?: number;
+  threshold?: number;
 }
 
 export interface APIResponse<T = any> {
